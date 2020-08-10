@@ -1,11 +1,7 @@
-export interface ITime{
-    start: number;
-    elapsed: number;
-}
 
 export interface ISnake {
-        x: number;
-        y: number;
+    x: number;
+    y: number;
 }
 
 export enum Direction {
