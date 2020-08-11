@@ -1,5 +1,11 @@
 
-export interface ISnake {
+
+export class ISnake {
+    previous: ICoordinates[] = [];
+    current: ICoordinates[] = [];
+}
+
+interface ICoordinates {
     x: number;
     y: number;
 }

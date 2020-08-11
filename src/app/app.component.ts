@@ -3,6 +3,7 @@ import { COLS, BLOCK_SIZE, ROWS, RENDER_BLOCK } from './constants';
 import { ISnake, Direction, KEY } from './models';
 import { BehaviorSubject, animationFrameScheduler, of, Observable, fromEvent, Subject } from 'rxjs';
 import { map, tap, repeat, takeUntil } from 'rxjs/operators';
+import { stringify } from '@angular/compiler/src/util';
 
 @Component({
   selector: 'app-root',
@@ -12,11 +13,9 @@ import { map, tap, repeat, takeUntil } from 'rxjs/operators';
 
 export class AppComponent implements OnInit, OnDestroy {
 
-  private unsubscribe: Subject<void>;
- 
   // Get reference to the canvas.
   @ViewChild('board', { static: true })
-  canvas: ElementRef<HTMLCanvasElement>;
+  private canvas: ElementRef<HTMLCanvasElement>;
 
   title = 'Snake';
   points = 0;
@@ -24,53 +23,73 @@ export class AppComponent implements OnInit, OnDestroy {
   score = 0;
   level = 0;
 
-  mutex: boolean = false;
-
-  horizontal: boolean = true;
-  direction: Direction = Direction.RIGHT;
-
-  keyPress: Observable<Event>;
+  private mutex: boolean;
+  private horizontal: boolean;
+  private tick: number;
   
-  board: number[][];
-  ctx: CanvasRenderingContext2D;
+  private direction = Direction.RIGHT;
 
-  tick: number
-
-  snake: BehaviorSubject<ISnake[]>;
+  private unsubscribe: Subject<void> =  new Subject();
+  private keyPress: Observable<Event> = fromEvent(document, 'keydown');
+  private ctx: CanvasRenderingContext2D;
+  private snake: BehaviorSubject<ISnake>;
+  constructor() {
+    const snakeDefault: ISnake = new ISnake();
+    snakeDefault.current.push({
+      x: 5,
+      y: 5
+    });
+    snakeDefault.previous.push({
+      x: 5,
+      y: 5
+    });
+    snakeDefault.current.push({
+      x: 4,
+      y: 5
+    });
+    snakeDefault.previous.push({
+      x: 4,
+      y: 5
+    });
+    snakeDefault.current.push({
+      x: 3,
+      y: 5
+    });
+    snakeDefault.previous.push({
+      x: 3,
+      y: 5
+    });
+    snakeDefault.current.push({
+      x: 2,
+      y: 5
+    });
+    snakeDefault.previous.push({
+      x: 2,
+      y: 5
+    });
+    this.snake = new BehaviorSubject(snakeDefault);
+  }
 
   ngOnInit() {
-      this.unsubscribe = new Subject();
-      const snake: ISnake[] = [];
-
-      snake.push({
-        x: 5,
-        y: 5
-      });
-      snake.push({
-        x: 4,
-        y: 5
-      });
-      snake.push({
-        x: 3,
-        y: 5
-      });
-      snake.push({
-        x: 2,
-        y: 5
-      });
-      this.initBoard();
-      this.snake = new BehaviorSubject(snake);
-      
-      this.snake.pipe(takeUntil(this.unsubscribe)).subscribe();
-
-      this.keyPress = fromEvent(document, 'keydown')
-      this.keyPress.pipe(
-        tap((event: KeyboardEvent) => {
-          this.keyEvent(event)
-        }),
-        takeUntil(this.unsubscribe)
-      ).subscribe();
+    this.initBoard();
+    this.snake.pipe(
+      map(snake => {
+      if(JSON.stringify(snake.current) ===  JSON.stringify(snake.previous)) {
+        return snake;
+      }
+      return this.updateSnake(snake);
+      }),
+      tap(snake => this.drawSnake(snake)),
+      takeUntil(this.unsubscribe))
+    .subscribe();
     
+    this.keyPress.pipe(
+      tap((event: KeyboardEvent) => {
+        this.keyEvent(event)
+      }),
+      takeUntil(this.unsubscribe)
+    ).subscribe();
+      
   }
 
   ngOnDestroy() {
@@ -81,7 +100,6 @@ export class AppComponent implements OnInit, OnDestroy {
   initBoard() {
     // Get the 2D context that we draw on.
     this.ctx = this.canvas.nativeElement.getContext('2d');
-
     // Calculate size of canvas from constants.
     this.ctx.canvas.width = COLS * BLOCK_SIZE;
     this.ctx.canvas.height = ROWS * BLOCK_SIZE;
@@ -89,7 +107,6 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   keyEvent(event: KeyboardEvent) {
-    console.log('press');
     if (KEY.UP === event.keyCode || KEY.DOWN === event.keyCode ||
         KEY.RIGHT === event.keyCode || KEY.LEFT === event.keyCode) {
       // If the keyCode exists in our moves stop the event from bubbling.
@@ -126,8 +143,7 @@ export class AppComponent implements OnInit, OnDestroy {
             break;
           }
         }
-      }
-      
+      }      
     }
   }
 
@@ -141,7 +157,6 @@ export class AppComponent implements OnInit, OnDestroy {
           if(this.tick > 13) {
             this.moveSnake();
             this.tick = 0;
-            this.draw();
           }
           this.tick++;
         }),
@@ -150,54 +165,97 @@ export class AppComponent implements OnInit, OnDestroy {
     ).subscribe();
   }
 
-  draw() {
-    this.drawSnake();
+  updateSnake(snake: ISnake) {
+    snake.current.forEach((_snakeBit, index) => {
+      if(index === 0) {
+        return;
+      }
+      snake.current[index].x = snake.previous[index-1].x;
+      snake.current[index].y = snake.previous[index-1].y;
+    });
+    
+    snake.previous = snake.current;
+    return snake;
   }
 
-  drawSnake() {
+
+
+  drawSnake(snake: ISnake) {
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
-    this.snake.getValue().forEach((snakeBit) => {
+    console.log(snake);
+    snake.current.forEach((snakeBit) => {
       this.ctx.fillRect(snakeBit.x, snakeBit.y, 1, 1);
     });
   }
 
+
+
   moveSnake() {
       const snake = this.snake.getValue();
-      snake.forEach((snakebit, index) => {
-        if(index > 0) {
-          snake[index-1].x = snakebit.x;
-          snake[index-1].y = snakebit.y;
+      switch (this.direction) {
+        case Direction.RIGHT: {
+          snake.current[0].x++;
+          this.mutex = false;
+          break;
         }
-        switch (this.direction) {
-          case Direction.RIGHT: {
-            snakebit.x++;
-            this.mutex = false;
-            break;
-          }
-          case Direction.LEFT: {
-            snakebit.x--;
-            this.mutex = false;
-            break;
-          }
-          case Direction.UP: {
-            snakebit.y--;
-            this.mutex = false;
-            break;
-          }
-          case Direction.DOWN: {
-            snakebit.y++;
-            this.mutex = false;
-            break;
-          }
+        case Direction.LEFT: {
+          snake.current[0].x--;
+          this.mutex = false;
+          break;
         }
-      });
+        case Direction.UP: {
+          snake.current[0].y--;
+          this.mutex = false;
+          break;
+        }
+        case Direction.DOWN: {
+          snake.current[0].y++;
+          this.mutex = false;
+          break;
+        }
+      }
+
+      // snake.forEach((snakebit, index) => {
+      //   if(index > 0) {
+      //     snake[index-1].x = snakebit.x;
+      //     snake[index-1].y = snakebit.y;
+      //   }
+      //   switch (this.direction) {
+      //     case Direction.RIGHT: {
+      //       snakebit.x++;
+      //       this.mutex = false;
+      //       break;
+      //     }
+      //     case Direction.LEFT: {
+      //       snakebit.x--;
+      //       this.mutex = false;
+      //       break;
+      //     }
+      //     case Direction.UP: {
+      //       snakebit.y--;
+      //       this.mutex = false;
+      //       break;
+      //     }
+      //     case Direction.DOWN: {
+      //       snakebit.y++;
+      //       this.mutex = false;
+      //       break;
+      //     }
+      //   }
+      // });
       this.snake.next(snake);
   }
 
   collisionHandler() {
-    if(this.snake[0].x > this.ctx.canvas.width) {
-      
+    const snake = this.snake.getValue()
+    if(snake[0].x > this.ctx.canvas.width) {
+      snake[0].x = 0;
     }
+    if(snake[0].x < 0) {
+      snake[0].x = this.ctx.canvas.width;
+    }
+
+    this.snake.next
   }
 
   getEmptyBoard(): number[][] {
