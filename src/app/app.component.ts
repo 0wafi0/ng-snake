@@ -3,7 +3,7 @@ import { COLS, BLOCK_SIZE, ROWS, RENDER_BLOCK } from './constants';
 import { ISnake, Direction, KEY } from './models';
 import { BehaviorSubject, animationFrameScheduler, of, Observable, fromEvent, Subject } from 'rxjs';
 import { map, tap, repeat, takeUntil } from 'rxjs/operators';
-import { stringify } from '@angular/compiler/src/util';
+import  * as _ from "lodash";
 
 @Component({
   selector: 'app-root',
@@ -23,8 +23,8 @@ export class AppComponent implements OnInit, OnDestroy {
   score = 0;
   level = 0;
 
-  private mutex: boolean;
-  private horizontal: boolean;
+  private mutex: boolean = true;
+  private horizontal: boolean = true;
   private tick: number;
   
   private direction = Direction.RIGHT;
@@ -74,10 +74,11 @@ export class AppComponent implements OnInit, OnDestroy {
     this.initBoard();
     this.snake.pipe(
       map(snake => {
-      if(JSON.stringify(snake.current) ===  JSON.stringify(snake.previous)) {
+      if(_.isEqual(snake.current,snake.previous)) {
+        console.log('early exit');
         return snake;
       }
-      return this.updateSnake(snake);
+      return this.updateSnake(this.outOfBounds(snake));
       }),
       tap(snake => this.drawSnake(snake)),
       takeUntil(this.unsubscribe))
@@ -173,8 +174,7 @@ export class AppComponent implements OnInit, OnDestroy {
       snake.current[index].x = snake.previous[index-1].x;
       snake.current[index].y = snake.previous[index-1].y;
     });
-    
-    snake.previous = snake.current;
+    snake.previous = _.cloneDeep(snake.current);;
     return snake;
   }
 
@@ -182,12 +182,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   drawSnake(snake: ISnake) {
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
-    console.log(snake);
     snake.current.forEach((snakeBit) => {
       this.ctx.fillRect(snakeBit.x, snakeBit.y, 1, 1);
     });
   }
-
 
 
   moveSnake() {
@@ -214,48 +212,24 @@ export class AppComponent implements OnInit, OnDestroy {
           break;
         }
       }
-
-      // snake.forEach((snakebit, index) => {
-      //   if(index > 0) {
-      //     snake[index-1].x = snakebit.x;
-      //     snake[index-1].y = snakebit.y;
-      //   }
-      //   switch (this.direction) {
-      //     case Direction.RIGHT: {
-      //       snakebit.x++;
-      //       this.mutex = false;
-      //       break;
-      //     }
-      //     case Direction.LEFT: {
-      //       snakebit.x--;
-      //       this.mutex = false;
-      //       break;
-      //     }
-      //     case Direction.UP: {
-      //       snakebit.y--;
-      //       this.mutex = false;
-      //       break;
-      //     }
-      //     case Direction.DOWN: {
-      //       snakebit.y++;
-      //       this.mutex = false;
-      //       break;
-      //     }
-      //   }
-      // });
       this.snake.next(snake);
   }
 
-  collisionHandler() {
-    const snake = this.snake.getValue()
-    if(snake[0].x > this.ctx.canvas.width) {
-      snake[0].x = 0;
+  outOfBounds(snake: ISnake) {
+    if(snake.current[0].x * RENDER_BLOCK >= this.ctx.canvas.width && this.direction === Direction.RIGHT) {
+      snake.current[0].x = 0;
     }
-    if(snake[0].x < 0) {
-      snake[0].x = this.ctx.canvas.width;
+    if(snake.current[0].x < 0 && this.direction === Direction.LEFT) {
+      snake.current[0].x = (this.ctx.canvas.width/RENDER_BLOCK - 1);
     }
 
-    this.snake.next
+    if(snake.current[0].y * RENDER_BLOCK >= this.ctx.canvas.height && this.direction === Direction.DOWN) {
+      snake.current[0].y = 0;
+    }
+    if(snake.current[0].y < 0 && this.direction === Direction.UP) {
+      snake.current[0].y = (this.ctx.canvas.height/RENDER_BLOCK - 1);
+    }
+    return snake;
   }
 
   getEmptyBoard(): number[][] {
