@@ -23,6 +23,8 @@ export class AppComponent implements OnInit, OnDestroy {
   score = 0;
   level = 0;
 
+  
+
   private mutex: boolean = true;
   private horizontal: boolean = true;
   private tick: number;
@@ -34,7 +36,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private ctx: CanvasRenderingContext2D;
   private snake: BehaviorSubject<ISnake>;
 
-  constructor() {
+  ngOnInit() {
     const snakeDefault: ISnake = new ISnake();
     snakeDefault.current.push({
       x: 5,
@@ -69,9 +71,6 @@ export class AppComponent implements OnInit, OnDestroy {
       y: 5
     });
     this.snake = new BehaviorSubject(snakeDefault);
-  }
-
-  ngOnInit() {
     this.initBoard();
     const defaultFood = this.spawnFood();
     const snake = this.snake.getValue();
@@ -189,6 +188,10 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   updateSnake(snake: ISnake) {
+    if(this.isCoordinateCollidingSnake(snake.current[0].x, snake.current[0].y)) {
+
+    }
+
     if(_.isEqual(snake.current[0], snake.food)) {
       this.mutex = true;
       snake.current = _.cloneDeep(snake.previous);
