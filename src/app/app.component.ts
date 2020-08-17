@@ -1,6 +1,6 @@
 import { Component, ViewChild, ElementRef, OnInit, OnDestroy } from '@angular/core';
 import { COLS, BLOCK_SIZE, ROWS, RENDER_BLOCK } from './constants';
-import { ISnake, Direction, KEY } from './models';
+import { ISnake, Direction, KEY, ICoordinates } from './models';
 import { BehaviorSubject, animationFrameScheduler, of, Observable, fromEvent, Subject } from 'rxjs';
 import { map, tap, repeat, takeUntil } from 'rxjs/operators';
 import  * as _ from "lodash";
@@ -33,6 +33,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private keyPress: Observable<Event> = fromEvent(document, 'keydown');
   private ctx: CanvasRenderingContext2D;
   private snake: BehaviorSubject<ISnake>;
+
   constructor() {
     const snakeDefault: ISnake = new ISnake();
     snakeDefault.current.push({
@@ -72,25 +73,31 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.initBoard();
+    const defaultFood = this.spawnFood();
+    const snake = this.snake.getValue();
+    snake.food = {
+      x: defaultFood.x,
+      y: defaultFood.y
+    }
+
+    this.snake.next(snake);  
     this.snake.pipe(
       map(snake => {
       if(_.isEqual(snake.current,snake.previous)) {
-        console.log('early exit');
         return snake;
       }
       return this.updateSnake(this.outOfBounds(snake));
       }),
-      tap(snake => this.drawSnake(snake)),
+      tap(snake => this.drawSnakeAndFood(snake)),
       takeUntil(this.unsubscribe))
     .subscribe();
-    
+
     this.keyPress.pipe(
       tap((event: KeyboardEvent) => {
         this.keyEvent(event)
       }),
       takeUntil(this.unsubscribe)
     ).subscribe();
-      
   }
 
   ngOnDestroy() {
@@ -107,10 +114,25 @@ export class AppComponent implements OnInit, OnDestroy {
     this.ctx.scale(RENDER_BLOCK, RENDER_BLOCK);
   }
 
+  spawnFood(): ICoordinates {
+    const x = Math.floor(Math.random() * (this.ctx.canvas.width/RENDER_BLOCK - 1));
+    const y = Math.floor(Math.random() * (this.ctx.canvas.height/RENDER_BLOCK - 1));
+    return this.isCoordinateCollidingSnake(x, y) ?
+    this.spawnFood() : {
+      x: x,
+      y: y
+    };
+  }
+
+  isCoordinateCollidingSnake(x: number, y: number): boolean {
+    const snake = this.snake.getValue();
+    return !!snake.previous.find(item => item.x === x &&  item.y === y);
+  }
+
   keyEvent(event: KeyboardEvent) {
     if (KEY.UP === event.keyCode || KEY.DOWN === event.keyCode ||
         KEY.RIGHT === event.keyCode || KEY.LEFT === event.keyCode) {
-      // If the keyCode exists in our moves stop the event from bubbling.
+      // if the keyCode exists in our moves stop the event from bubbling. 
       if(this.mutex === false) {
         this.mutex = true;
         event.preventDefault();
@@ -155,7 +177,7 @@ export class AppComponent implements OnInit, OnDestroy {
           if(!this.tick) {
             this.tick = 0;
           }
-          if(this.tick > 13) {
+          if(this.tick > 6) {
             this.moveSnake();
             this.tick = 0;
           }
@@ -167,6 +189,14 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   updateSnake(snake: ISnake) {
+    if(_.isEqual(snake.current[0], snake.food)) {
+      this.mutex = true;
+      snake.current = _.cloneDeep(snake.previous);
+      snake.current.push(snake.food);
+      snake.previous.push(snake.food);
+      snake.food = this.spawnFood();
+      return snake
+    }
     snake.current.forEach((_snakeBit, index) => {
       if(index === 0) {
         return;
@@ -174,19 +204,17 @@ export class AppComponent implements OnInit, OnDestroy {
       snake.current[index].x = snake.previous[index-1].x;
       snake.current[index].y = snake.previous[index-1].y;
     });
-    snake.previous = _.cloneDeep(snake.current);;
+    snake.previous = _.cloneDeep(snake.current);
     return snake;
   }
 
-
-
-  drawSnake(snake: ISnake) {
+  drawSnakeAndFood(snake: ISnake) {
     this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
     snake.current.forEach((snakeBit) => {
       this.ctx.fillRect(snakeBit.x, snakeBit.y, 1, 1);
     });
+    this.ctx.fillRect(snake.food.x, snake.food.y, 1, 1);
   }
-
 
   moveSnake() {
       const snake = this.snake.getValue();
