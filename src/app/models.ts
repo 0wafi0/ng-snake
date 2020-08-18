@@ -4,6 +4,7 @@ export class ISnake {
     previous: ICoordinates[] = [];
     current: ICoordinates[] = [];
     food: ICoordinates;
+    direction: Direction
 }
 
 export interface ICoordinates {
