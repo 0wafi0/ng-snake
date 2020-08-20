@@ -47,11 +47,11 @@ export function generateDefaultSnake(ctx: CanvasRenderingContext2D) {
   }
 
   export function snakeLoopInit(snakeSub: BehaviorSubject<ISnake>, ctx: CanvasRenderingContext2D,
-    dialog: MatDialog, unsubscribe: Subject<void>) {
+    dialog: MatDialog, unsubscribe: Subject<void>, restart: Subject<void>) {
     snakeSub.pipe(
       map(snake => {
         if(JSON.stringify(snake.current) !== JSON.stringify(snake.previous)){
-          updateSnake(outOfBounds(snake, ctx), ctx, dialog, unsubscribe, snakeSub);
+          updateSnake(outOfBounds(snake, ctx), ctx, dialog, unsubscribe, snakeSub, restart);
         }
       return snake;
       }),
@@ -111,13 +111,14 @@ export function generateDefaultSnake(ctx: CanvasRenderingContext2D) {
   }
 
 
- function updateSnake(snake: ISnake, ctx: CanvasRenderingContext2D, dialog: MatDialog, unsubscribe: Subject<void>, snakeSub: BehaviorSubject<ISnake>): boolean {
+ function updateSnake(snake: ISnake, ctx: CanvasRenderingContext2D, dialog: MatDialog, unsubscribe: Subject<void>, snakeSub: BehaviorSubject<ISnake>, restart: Subject<void>): boolean {
     if(isHeadColliding(snake.current[0], snakeSub)) {
       const dialogRef = dialog.open(GameOverDialogComponent, {
-        width: '250px'
+        width: '600px'
       });
       unsubscribe.next();
       dialogRef.afterClosed().subscribe(_result => {
+        restart.next();
       });
     }
 

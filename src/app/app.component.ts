@@ -30,6 +30,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private tick: number;
 
   private unsubscribe: Subject<void> =  new Subject();
+  private restart: Subject<void> =  new Subject();
   private keyPress: Observable<Event> = fromEvent(document, 'keydown');
   private ctx: CanvasRenderingContext2D;
   private snake: BehaviorSubject<ISnake>;
@@ -40,13 +41,24 @@ export class AppComponent implements OnInit, OnDestroy {
     this.initBoard();
     this.snake = generateDefaultSnake(this.ctx);
     
-    snakeLoopInit(this.snake, this.ctx, this.dialog, this.unsubscribe);
+    snakeLoopInit(this.snake, this.ctx, this.dialog, this.unsubscribe, this.restart);
     this.keyPressLoopInit(this.keyPress);
+
+    this.restart.pipe(tap(_value => {
+      this.initBoard();
+      this.snake = generateDefaultSnake(this.ctx);
+      
+      snakeLoopInit(this.snake, this.ctx, this.dialog, this.unsubscribe, this.restart);
+      this.keyPressLoopInit(this.keyPress);
+    }),
+    ).subscribe();
   }
 
   ngOnDestroy() {
     this.unsubscribe.next();
     this.unsubscribe.complete();
+    this.restart.unsubscribe();
+    this.restart.complete();
     this.snake.complete();
   }
 
