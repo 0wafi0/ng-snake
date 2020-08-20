@@ -26,6 +26,7 @@ export class AppComponent implements OnInit, OnDestroy {
   level = 0;
 
   private mutex: boolean = true;
+  private isPlaying: boolean = false;
   private horizontal: boolean = true;
   private tick: number;
 
@@ -47,7 +48,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.restart.pipe(tap(_value => {
       this.initBoard();
       this.snake = generateDefaultSnake(this.ctx);
-      
+      this.isPlaying = false;
       snakeLoopInit(this.snake, this.ctx, this.dialog, this.unsubscribe, this.restart);
       this.keyPressLoopInit(this.keyPress);
     }),
@@ -122,7 +123,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   play(){
-    of(null, animationFrameScheduler)
+    if(!this.isPlaying) {
+      this.isPlaying = true;
+      of(null, animationFrameScheduler)
       .pipe(
         tap(() => {
           if(!this.tick) {
@@ -137,6 +140,7 @@ export class AppComponent implements OnInit, OnDestroy {
         }),
         repeat(),
         takeUntil(this.unsubscribe),
-    ).subscribe();
+      ).subscribe();
+    }
   }
 }
